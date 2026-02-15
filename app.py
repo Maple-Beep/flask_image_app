@@ -1,7 +1,7 @@
 # flask_image_app/app.py
 # ========================================================================
 # flask_image_app/app.py
-# 主应用文件 - 已修复级联删除问题，并实现自助密码找回功能
+# 主应用文件 - 已添加增强的AI报告生成功能
 # ========================================================================
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, abort, session
 from flask_sqlalchemy import SQLAlchemy
@@ -14,7 +14,7 @@ from datetime import datetime
 from config import Config
 import random
 
-# --- ✅ 恢复标准导入：使用解耦的推理引擎 ---
+# --- ✅ 使用增强版的推理引擎 ---
 from inference_engine.engine import MedicalReportEngine
 
 # --- 初始化Flask应用 ---
@@ -47,6 +47,7 @@ class User(UserMixin, db.Model):
 class ImageModel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(120), nullable=False)
+    original_filename = db.Column(db.String(120))  # 添加原始文件名字段
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     upload_date = db.Column(db.DateTime, default=datetime.now)
     ai_report = db.Column(db.Text)
@@ -154,10 +155,22 @@ def upload_image():
     if request.method == 'POST':
         file = request.files['image']
         if file and file.filename != '':
+            original_filename = file.filename
             filename = secure_filename(file.filename)
+            
+            # 如果文件名已存在，添加时间戳
+            if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], filename)):
+                name, ext = os.path.splitext(filename)
+                filename = f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
+            
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
-            new_image = ImageModel(filename=filename, user_id=current_user.id)
+            
+            new_image = ImageModel(
+                filename=filename, 
+                original_filename=original_filename,
+                user_id=current_user.id
+            )
             db.session.add(new_image)
             db.session.commit()
             flash("图片上传成功！", "success")
@@ -286,11 +299,11 @@ def forgot_password():
     return render_template('forgot_password.html', step=1)
 
 
-# --- 修正路由：生成AI报告 ---
+# --- 增强的AI报告生成路由 ---
 @app.route('/generate_report/<int:image_id>', methods=['POST'])
 @login_required
 def generate_report(image_id):
-    """为指定图片生成AI报告"""
+    """为指定图片生成AI报告（使用增强的采样策略）"""
     image = ImageModel.query.get_or_404(image_id)
     if image.user_id != current_user.id:
         abort(403)
@@ -302,7 +315,17 @@ def generate_report(image_id):
         return redirect(url_for('user_profile'))
 
     image_path = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'], image.filename)
-    report_text = report_engine.generate(image_path)
+    
+    # 使用增强的采样策略生成报告
+    # 可以调整这些参数来控制生成的多样性
+    report_text = report_engine.generate(
+        image_path,
+        temperature=0.8,      # 温度：0.7-1.0，越高越随机
+        top_k=50,             # Top-K采样：保留概率最高的50个词
+        top_p=0.9,            # Top-P采样：核采样，累积概率0.9
+        use_sampling=True     # 使用采样而非贪婪解码
+    )
+    
     image.ai_report = report_text
     db.session.commit()
     flash("AI报告已生成！", "success")
@@ -337,7 +360,7 @@ if __name__ == '__main__':
             'EOS_TOKEN_ID': app.config['EOS_TOKEN_ID'],
         }
 
-        # ✅ 使用来自 inference_engine 的 MedicalReportEngine
-        app.report_engine = MedicalReportEngine(config_dict=engine_config)
+        # ✅ 使用增强版的 MedicalReportEngine（可选启用debug模式）
+        app.report_engine = MedicalReportEngine(config_dict=engine_config, debug=False)
 
     app.run(debug=True)
