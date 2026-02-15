@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}用户注册{% endblock %}
+{% block content %}
+<style>
+    .register-container {
+        max-width: 520px;
+        margin: 0 auto;
+    }
+    
+    .register-header {
+        text-align: center;
+        margin-bottom: 2.5rem;
+    }
+    
+    .register-header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .register-header p {
+        font-size: 1.1rem;
+        color: var(--text-muted);
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: var(--text-color);
+    }
+    
+    .form-group input {
+        width: 100%;
+        padding: 14px 18px 14px 50px;
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        font-size: 1rem;
+        color: var(--text-color);
+        transition: all 0.3s ease;
+        font-family: 'Noto Sans SC', sans-serif;
+    }
+    
+    .form-group input:focus {
+        outline: none;
+        border-color: #667eea;
+        background: rgba(102, 126, 234, 0.05);
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .input-icon {
+        position: absolute;
+        left: 18px;
+        top: 43px;
+        color: var(--text-muted);
+        font-size: 1.2rem;
+        pointer-events: none;
+    }
+    
+    .password-strength {
+        height: 4px;
+        background: var(--border-color);
+        border-radius: 2px;
+        margin-top: 8px;
+        overflow: hidden;
+    }
+    
+    .password-strength-bar {
+        height: 100%;
+        width: 0%;
+        transition: all 0.3s ease;
+        border-radius: 2px;
+    }
+    
+    .strength-weak { width: 33%; background: var(--error-color); }
+    .strength-medium { width: 66%; background: var(--warning-color); }
+    .strength-strong { width: 100%; background: var(--success-color); }
+    
+    .form-actions {
+        margin-top: 2rem;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+        padding: 15px;
+        font-size: 1.05rem;
+        font-weight: 600;
+    }
+    
+    .form-footer {
+        margin-top: 2rem;
+        text-align: center;
+        padding-top: 2rem;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .form-footer p {
+        margin-bottom: 0;
+    }
+    
+    .form-footer a {
+        color: #a0aeff;
+        font-weight: 500;
+    }
+    
+    .info-box {
+        background: rgba(102, 126, 234, 0.1);
+        border-left: 4px solid #667eea;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+    
+    .info-box p {
+        margin: 0;
+        color: #a0aeff;
+        font-size: 0.95rem;
+    }
+</style>
+
+<div class="register-container">
+    <div class="register-header">
+        <h1>创建账户</h1>
+        <p>加入我们，开始您的图片分享之旅</p>
+    </div>
+    
+    <div class="info-box">
+        <p>💡 请使用真实的邮箱地址，以便接收重要通知</p>
+    </div>
+    
+    <form method="POST">
+        <div class="form-group">
+            <label for="username">用户名</label>
+            <span class="input-icon">👤</span>
+            <input type="text" id="username" name="username" placeholder="请输入用户名" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="email">邮箱地址</label>
+            <span class="input-icon">📧</span>
+            <input type="email" id="email" name="email" placeholder="your@email.com" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="password">密码</label>
+            <span class="input-icon">🔒</span>
+            <input type="password" id="password" name="password" placeholder="请输入密码（至少6位）" required>
+            <div class="password-strength">
+                <div class="password-strength-bar" id="strengthBar"></div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="confirm_password">确认密码</label>
+            <span class="input-icon">✓</span>
+            <input type="password" id="confirm_password" name="confirm_password" placeholder="请再次输入密码" required>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn">注册</button>
+        </div>
+    </form>
+    
+    <div class="form-footer">
+        <p>已有账户？ <a href="{{ url_for('login') }}">立即登录</a></p>
+    </div>
+</div>
+
+<script>
+    // 密码强度检测
+    document.getElementById('password').addEventListener('input', function(e) {
+        const password = e.target.value;
+        const strengthBar = document.getElementById('strengthBar');
+        
+        strengthBar.className = 'password-strength-bar';
+        
+        if (password.length === 0) {
+            strengthBar.style.width = '0%';
+        } else if (password.length < 6) {
+            strengthBar.classList.add('strength-weak');
+        } else if (password.length < 10) {
+            strengthBar.classList.add('strength-medium');
+        } else {
+            strengthBar.classList.add('strength-strong');
+        }
+    });
+</script>
+{% endblock %}

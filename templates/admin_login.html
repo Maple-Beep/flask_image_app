@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}管理员登录{% endblock %}
+{% block content %}
+<style>
+    .admin-login-container {
+        max-width: 480px;
+        margin: 0 auto;
+    }
+    
+    .admin-badge {
+        display: inline-block;
+        background: var(--secondary-gradient);
+        color: white;
+        padding: 8px 20px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 1.5rem;
+        animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+    
+    .admin-login-header {
+        text-align: center;
+        margin-bottom: 2.5rem;
+    }
+    
+    .admin-login-header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .admin-login-header p {
+        font-size: 1.1rem;
+        color: var(--text-muted);
+    }
+    
+    .form-container-admin {
+        background: linear-gradient(135deg, rgba(245, 87, 108, 0.05) 0%, rgba(240, 147, 251, 0.05) 100%);
+        padding: 2.5rem;
+        border-radius: 16px;
+        border: 1px solid rgba(245, 87, 108, 0.2);
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: var(--text-color);
+    }
+    
+    .form-group input {
+        width: 100%;
+        padding: 14px 18px 14px 50px;
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        font-size: 1rem;
+        color: var(--text-color);
+        transition: all 0.3s ease;
+        font-family: 'Noto Sans SC', sans-serif;
+    }
+    
+    .form-group input:focus {
+        outline: none;
+        border-color: #f5576c;
+        background: rgba(245, 87, 108, 0.05);
+        box-shadow: 0 0 0 3px rgba(245, 87, 108, 0.1);
+    }
+    
+    .input-icon {
+        position: absolute;
+        left: 18px;
+        top: 43px;
+        color: var(--text-muted);
+        font-size: 1.2rem;
+        pointer-events: none;
+    }
+    
+    .btn-admin {
+        width: 100%;
+        padding: 15px;
+        font-size: 1.05rem;
+        font-weight: 600;
+        background: var(--secondary-gradient);
+        box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+    }
+    
+    .btn-admin:hover {
+        box-shadow: 0 8px 25px rgba(245, 87, 108, 0.5);
+    }
+    
+    .form-footer {
+        margin-top: 2rem;
+        text-align: center;
+        padding-top: 2rem;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .security-notice {
+        background: rgba(255, 107, 107, 0.1);
+        border-left: 4px solid var(--error-color);
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        margin-top: 2rem;
+    }
+    
+    .security-notice p {
+        margin: 0;
+        color: var(--error-color);
+        font-size: 0.9rem;
+    }
+</style>
+
+<div class="admin-login-container">
+    <div class="admin-login-header">
+        <span class="admin-badge">🛡️ 管理员</span>
+        <h1>管理员入口</h1>
+        <p>请使用管理员账户登录</p>
+    </div>
+    
+    <div class="form-container-admin">
+        <form method="POST">
+            <div class="form-group">
+                <label for="username_or_email">用户名或邮箱</label>
+                <span class="input-icon">👤</span>
+                <input type="text" id="username_or_email" name="username_or_email" placeholder="请输入管理员用户名或邮箱" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">密码</label>
+                <span class="input-icon">🔐</span>
+                <input type="password" id="password" name="password" placeholder="请输入管理员密码" required>
+            </div>
+            
+            <button type="submit" class="btn btn-admin">管理员登录</button>
+        </form>
+        
+        <div class="security-notice">
+            <p>⚠️ 此页面仅供管理员使用。未经授权的访问将被记录。</p>
+        </div>
+    </div>
+    
+    <div class="form-footer">
+        <p><a href="{{ url_for('login') }}">返回用户登录</a></p>
+    </div>
+</div>
+{% endblock %}

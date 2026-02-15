@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% block title %}{{ current_user.username }}的主页{% endblock %}
+{% block content %}
+<style>
+    .profile-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 3rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .profile-info h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    
+    .user-avatar {
+        width: 60px;
+        height: 60px;
+        background: var(--primary-gradient);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+    }
+    
+    .upload-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 30px;
+    }
+    
+    .upload-btn::before {
+        content: '📤';
+        font-size: 1.2rem;
+    }
+    
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    
+    .section-header h2 {
+        margin: 0;
+        font-size: 1.8rem;
+    }
+    
+    .image-count {
+        background: rgba(102, 126, 234, 0.1);
+        color: #a0aeff;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    
+    .images-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 30px;
+        margin-top: 2rem;
+    }
+    
+    .image-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 0;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        animation: fadeInUp 0.4s ease-out;
+    }
+    
+    .image-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 20px 40px rgba(102, 126, 234, 0.2);
+        border-color: rgba(102, 126, 234, 0.3);
+    }
+    
+    .image-wrapper {
+        position: relative;
+        width: 100%;
+        padding-top: 75%;
+        overflow: hidden;
+        background: var(--bg-light);
+    }
+    
+    .image-preview {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.4s ease;
+    }
+    
+    .image-card:hover .image-preview {
+        transform: scale(1.05);
+    }
+    
+    .image-info {
+        padding: 1.5rem;
+    }
+    
+    .image-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+    
+    .image-filename {
+        font-weight: 500;
+        color: var(--text-color);
+        margin-bottom: 0.5rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .ai-report-section {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: linear-gradient(135deg, rgba(78, 205, 196, 0.1) 0%, rgba(102, 126, 234, 0.1) 100%);
+        border-radius: 8px;
+        border-left: 3px solid var(--accent-secondary);
+    }
+    
+    .ai-report-section strong {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: var(--accent-secondary);
+        font-size: 0.9rem;
+    }
+    
+    .ai-report-section p {
+        margin: 0;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        color: var(--text-color);
+    }
+    
+    .generate-report-form {
+        margin-top: 1rem;
+    }
+    
+    .generate-report-form .btn {
+        width: 100%;
+        padding: 10px;
+        font-size: 0.9rem;
+        background: linear-gradient(135deg, rgba(78, 205, 196, 0.2) 0%, rgba(102, 126, 234, 0.2) 100%);
+        border: 1px solid var(--accent-secondary);
+        color: var(--accent-secondary);
+        box-shadow: none;
+    }
+    
+    .generate-report-form .btn:hover {
+        background: var(--accent-secondary);
+        color: white;
+        box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: var(--glass-bg);
+        border-radius: 16px;
+        border: 2px dashed var(--border-color);
+    }
+    
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+    
+    .empty-state h3 {
+        margin-bottom: 1rem;
+        color: var(--text-color);
+    }
+    
+    .empty-state p {
+        margin-bottom: 2rem;
+        font-size: 1.1rem;
+    }
+    
+    @media (max-width: 768px) {
+        .profile-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 20px;
+        }
+        
+        .images-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .section-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+        }
+    }
+</style>
+
+<div class="profile-header">
+    <div class="profile-info">
+        <h1>
+            <span class="user-avatar">👤</span>
+            {{ current_user.username }}的主页
+        </h1>
+        <p style="margin: 0;">欢迎回来，开始管理您的图片收藏吧！</p>
+    </div>
+    <a href="{{ url_for('upload_image') }}" class="btn upload-btn">上传新图片</a>
+</div>
+
+<div class="section-header">
+    <h2>我的图片</h2>
+    {% if images %}
+    <span class="image-count">共 {{ images|length }} 张图片</span>
+    {% endif %}
+</div>
+
+{% if images %}
+    <div class="images-grid">
+        {% for img in images %}
+        <div class="image-card">
+            <div class="image-wrapper">
+                <img src="{{ url_for('uploaded_file', filename=img.filename) }}" alt="Uploaded Image" class="image-preview">
+            </div>
+            <div class="image-info">
+                <div class="image-filename">{{ img.original_filename }}</div>
+                <div class="image-meta">
+                    <span>📅 {{ img.upload_date.strftime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+                
+                {% if img.ai_report %}
+                    <div class="ai-report-section">
+                        <strong>🤖 AI生成的报告</strong>
+                        <p>{{ img.ai_report }}</p>
+                    </div>
+                {% else %}
+                    <form action="{{ url_for('generate_report', image_id=img.id) }}" method="POST" class="generate-report-form">
+                        <button type="submit" class="btn">生成AI报告</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">📸</div>
+        <h3>还没有上传任何图片</h3>
+        <p>开始上传您的第一张图片，建立您的专属收藏</p>
+        <a href="{{ url_for('upload_image') }}" class="btn">立即上传</a>
+    </div>
+{% endif %}
+{% endblock %}

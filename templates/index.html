@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}首页{% endblock %}
+{% block content %}
+<div style="text-align: center; margin-bottom: 3rem;">
+    <h1 style="font-size: 3.5rem; margin-bottom: 1rem; animation: fadeIn 0.8s ease-out;">欢迎来到我的图片分享站</h1>
+    <p style="font-size: 1.3rem; color: var(--text-muted); max-width: 700px; margin: 0 auto;">一个安全、便捷的在线图片存储与分享平台</p>
+</div>
+
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 30px;
+        margin-top: 3rem;
+    }
+    
+    .feature-card {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        backdrop-filter: blur(10px);
+        padding: 2.5rem;
+        border-radius: 20px;
+        border: 1px solid var(--glass-border);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        position: relative;
+        overflow: hidden;
+        animation: cardSlideIn 0.6s ease-out backwards;
+    }
+    
+    .feature-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: var(--primary-gradient);
+        opacity: 0;
+        transition: opacity 0.4s ease;
+    }
+    
+    .feature-card:hover::before {
+        opacity: 0.1;
+    }
+    
+    .feature-card:nth-child(1) { animation-delay: 0.1s; }
+    .feature-card:nth-child(2) { animation-delay: 0.2s; }
+    .feature-card:nth-child(3) { animation-delay: 0.3s; }
+    
+    @keyframes cardSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(30px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-10px) scale(1.02);
+        box-shadow: 0 25px 50px rgba(102, 126, 234, 0.3);
+        border-color: rgba(102, 126, 234, 0.5);
+    }
+    
+    .feature-card h2 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .feature-card p {
+        font-size: 1.05rem;
+        line-height: 1.7;
+        color: var(--text-muted);
+        position: relative;
+        z-index: 1;
+    }
+    
+    .feature-icon {
+        width: 60px;
+        height: 60px;
+        margin-bottom: 1.5rem;
+        background: var(--primary-gradient);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .cta-section {
+        margin-top: 4rem;
+        text-align: center;
+        padding: 3rem;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(245, 87, 108, 0.15) 100%);
+        border-radius: 20px;
+        border: 1px solid var(--glass-border);
+        animation: fadeInUp 0.8s ease-out 0.4s backwards;
+    }
+    
+    .cta-section h2 {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+    }
+    
+    .cta-section p {
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    .cta-buttons {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    @media (max-width: 768px) {
+        h1 {
+            font-size: 2.5rem !important;
+        }
+        
+        .feature-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .cta-section {
+            padding: 2rem;
+        }
+    }
+</style>
+
+<div class="feature-grid">
+    <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h2>安全注册与登录</h2>
+        <p>支持普通用户和管理员两种身份，采用先进的加密技术确保您的数据安全无忧。</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">📸</div>
+        <h2>图片上传与管理</h2>
+        <p>用户可以轻松上传个人图片，支持多种格式。管理员可进行全局管理，打造有序的社区环境。</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">✨</div>
+        <h2>个性化空间</h2>
+        <p>每个用户都拥有专属的个人主页，自由展示上传的精彩内容，记录生活的美好瞬间。</p>
+    </div>
+</div>
+
+<div class="cta-section">
+    <h2>准备好开始了吗？</h2>
+    <p>加入我们的社区，开始分享您的精彩瞬间</p>
+    <div class="cta-buttons">
+        {% if not current_user.is_authenticated %}
+        <a href="{{ url_for('register') }}" class="btn" style="margin: 0;">立即注册</a>
+        <a href="{{ url_for('login') }}" class="btn" style="margin: 0; background: rgba(255,255,255,0.1); box-shadow: none;">已有账户？登录</a>
+        {% else %}
+        <a href="{{ url_for('user_profile') }}" class="btn" style="margin: 0;">前往个人中心</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
