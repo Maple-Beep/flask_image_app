@@ -1,8 +1,6 @@
-# inference_engine/engine.py
-# ========================================================================
-# flask_image_app/inference_engine/engine.py
-# 医疗报告生成引擎 - 增强版（添加多样性采样和调试功能）
-# ========================================================================
+# =============================================================================
+# inference_engine/engine.py — 医疗报告生成引擎（匹配训练模型）
+# =============================================================================
 
 import os
 import torch
@@ -10,12 +8,11 @@ import pickle
 from PIL import Image
 from torchvision import transforms
 
-# ✅ 导入增强版的模型定义
 from .model_definition import IUReportGenerator
 
 
 class MedicalReportEngine:
-    """医疗报告生成引擎（增强版）"""
+    """医疗报告生成引擎（匹配训练模型版本）"""
 
     def __init__(self, config_dict, debug=False):
         """
@@ -30,7 +27,7 @@ class MedicalReportEngine:
         if self.debug:
             print(f"🔧 使用设备: {self.device}")
 
-        # --- ✅ 智能处理 IMG_SIZE 配置 ---
+        # 图像预处理
         img_size = self.config['IMG_SIZE']
         if isinstance(img_size, int):
             resize_args = (img_size, img_size)
@@ -44,6 +41,7 @@ class MedicalReportEngine:
             transforms.ToTensor(),
             transforms.Normalize(mean=self.config['IMG_MEAN'], std=self.config['IMG_STD'])
         ])
+        
         self.model = None
         self.vocab = None
         self._load_model_and_vocab()
@@ -57,28 +55,62 @@ class MedicalReportEngine:
             self.model = None
             self.vocab = None
             print("❌ 警告: 模型或词汇表文件未找到，AI报告功能将不可用。")
+            print(f"   模型路径: {model_path}")
+            print(f"   词汇表路径: {vocab_path}")
             return
 
         # 加载词汇表
-        with open(vocab_path, 'rb') as f:
-            self.vocab = pickle.load(f)
-        
-        if self.debug:
-            print(f"📚 词汇表大小: {len(self.vocab.get('idx2word', {}))}")
+        try:
+            with open(vocab_path, 'rb') as f:
+                self.vocab = pickle.load(f)
+            
+            if self.debug:
+                print(f"📚 词汇表加载成功")
+                if isinstance(self.vocab, dict):
+                    print(f"   词汇表大小: {len(self.vocab.get('idx2word', {}))}")
+        except Exception as e:
+            print(f"❌ 词汇表加载失败: {str(e)}")
+            self.vocab = None
+            return
 
-        # 使用传入的配置字典来实例化模型
-        self.model = IUReportGenerator(
-            vocab_size=self.config['VOCAB_SIZE'],
-            cnn_out_features=self.config['CNN_OUT_FEATURES'],
-            lstm_hidden_size=self.config['LSTM_HIDDEN_SIZE'],
-            lstm_num_layers=self.config['LSTM_NUM_LAYERS'],
-            lstm_dropout=self.config['LSTM_DROPOUT'],
-        )
-
-        checkpoint = torch.load(model_path, map_location=self.device, weights_only=True)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        self.model.to(self.device).eval()
-        print("✅ 医疗报告引擎加载成功！")
+        # 实例化模型
+        try:
+            self.model = IUReportGenerator(
+                vocab_size=self.config['VOCAB_SIZE'],
+                use_disease_features=True
+            )
+            
+            if self.debug:
+                print(f"📦 模型结构创建成功")
+            
+            # 加载权重
+            checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
+            
+            if self.debug:
+                print(f"📂 检查点加载成功")
+                if isinstance(checkpoint, dict):
+                    print(f"   检查点键: {list(checkpoint.keys())}")
+            
+            # 提取state_dict
+            if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                state_dict = checkpoint['model_state_dict']
+            else:
+                state_dict = checkpoint
+            
+            # 加载state_dict
+            self.model.load_state_dict(state_dict, strict=True)
+            self.model.to(self.device)
+            self.model.eval()
+            
+            print("✅ 医疗报告引擎加载成功！")
+            
+        except Exception as e:
+            print(f"❌ 模型加载失败: {str(e)}")
+            import traceback
+            if self.debug:
+                traceback.print_exc()
+            self.model = None
+            return
 
     def generate(
         self, 
@@ -98,7 +130,7 @@ class MedicalReportEngine:
         - use_sampling: 是否使用采样（True推荐，False则使用贪婪解码）
         """
         if self.model is None or self.vocab is None:
-            return "AI报告功能暂不可用。"
+            return "AI报告功能暂不可用。请检查模型文件是否正确放置。"
 
         try:
             # 加载并预处理图像
@@ -117,8 +149,8 @@ class MedicalReportEngine:
                     eos_id=self.config['EOS_TOKEN_ID'],
                     max_len=self.config['MAX_REPORT_LEN'],
                     temperature=temperature,
-                    top_k=top_k,
-                    top_p=top_p,
+                    top_k=top_k if top_k > 0 else None,
+                    top_p=top_p if top_p > 0.0 else None,
                     use_sampling=use_sampling
                 )
             
@@ -129,12 +161,18 @@ class MedicalReportEngine:
             words = []
             token_ids = output_ids[0].cpu().numpy()
             
+            # 获取idx2word映射
+            if isinstance(self.vocab, dict):
+                idx2word = self.vocab.get('idx2word', self.vocab)
+            else:
+                idx2word = self.vocab
+            
             for idx in token_ids:
                 if idx == self.config['EOS_TOKEN_ID']:
                     break
                 if idx not in [self.config['PAD_TOKEN_ID'], self.config['SOS_TOKEN_ID']]:
-                    word = self.vocab['idx2word'].get(int(idx), '<unk>')
-                    if word not in ['<UNK>', '<unk>', '<pad>', '<PAD>']:
+                    word = idx2word.get(int(idx), '<unk>')
+                    if word not in ['<UNK>', '<unk>', '<pad>', '<PAD>', '<SOS>', '<sos>', '<EOS>', '<eos>']:
                         words.append(word)
             
             if self.debug:
@@ -176,8 +214,6 @@ class MedicalReportEngine:
     ) -> list:
         """
         为同一张图片生成多个不同的报告
-        
-        这对于诊断多样性问题很有用
         """
         reports = []
         for i in range(num_samples):

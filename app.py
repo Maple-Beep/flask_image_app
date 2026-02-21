@@ -9,7 +9,6 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
-import secrets
 from datetime import datetime
 from config import Config
 import random

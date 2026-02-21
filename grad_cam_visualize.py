@@ -1,7 +1,6 @@
 # ========================================================================
-# grad_cam_visualize.py - 为你的医疗报告生成模型生成 Grad-CAM 热力图
-# 适配模型: ResNet18 + LSTM (来自 model_definition.py)
-# 修正：支持 CUDA + LSTM 反向传播，自动管理 model.train()/eval() 模式
+# grad_cam_visualize.py - Grad-CAM 热力图可视化（修复版）
+# 适配模型: 疾病感知的CNN + LSTM报告生成模型
 # ========================================================================
 import os
 import sys
@@ -12,7 +11,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-# 添加项目路径以便导入本地模块
+# 添加项目路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import Config
@@ -20,7 +19,7 @@ from inference_engine.engine import MedicalReportEngine
 
 
 class GradCAM:
-    """Grad-CAM 实现，适配 ResNet-based 医疗图像描述模型"""
+    """Grad-CAM 实现（修复版）"""
 
     def __init__(self, model, target_layer):
         self.model = model
@@ -28,63 +27,80 @@ class GradCAM:
         self.feature_maps = None
         self.gradients = None
 
-        # 注册前向和反向 hook
+        # 注册 hook（修复签名）
         self.target_layer.register_forward_hook(self.save_feature_maps)
         self.target_layer.register_full_backward_hook(self.save_gradients)
 
     def save_feature_maps(self, module, input, output):
+        """保存特征图 - 正确的hook签名"""
         self.feature_maps = output.detach()
 
-    def save_gradients(self, module, grad_in, grad_out):
-        self.gradients = grad_out[0].detach()
+    def save_gradients(self, module, grad_input, grad_output):
+        """保存梯度 - 正确的hook签名"""
+        self.gradients = grad_output[0].detach()
 
-    def __call__(self, image_tensor, sos_id, eos_id, max_len=20):
+    def __call__(self, image_tensor, max_len=10):
         """
         生成 Grad-CAM 热力图
         :param image_tensor: 预处理后的图像 [1, C, H, W]
-        :param sos_id: 开始符 ID
-        :param eos_id: 结束符 ID
         :param max_len: 最大生成长度（控制计算量）
         :return: 热力图 numpy array [H, W]
         """
-        # 保存原始模式，并强制进入 train 模式以支持 LSTM backward
+        # 保存原始模式
         was_training = self.model.training
         self.model.train()
         image_tensor.requires_grad_(True)
 
         try:
             with torch.enable_grad():
-                # 前向：获取 CNN 特征
-                cnn_features = self.model.encoder(image_tensor)  # [B, 256]
+                # 前向传播：获取特征图和全局特征
+                feature_map, global_features = self.model.encoder(image_tensor)  # [B, 512, 7, 7], [B, 512]
 
-                # 初始化 LSTM 隐藏状态
-                h = self.model.decoder.init_h(cnn_features).unsqueeze(0).repeat(
-                    self.model.decoder.num_layers, 1, 1
-                )
-                c = self.model.decoder.init_c(cnn_features).unsqueeze(0).repeat(
-                    self.model.decoder.num_layers, 1, 1
-                )
+                # 获取疾病特征
+                disease_logits = self.model.disease_classifier(global_features)
+                disease_features = torch.sigmoid(disease_logits)  # [B, 14]
 
-                # 第一个输入 token: SOS
-                input_ids = torch.full(
-                    (1, 1), sos_id, dtype=torch.long, device=image_tensor.device
-                )
+                # 初始化LSTM状态
+                B = image_tensor.size(0)
+                h = torch.zeros(1, B, 512, device=image_tensor.device)
+                c = torch.zeros(1, B, 512, device=image_tensor.device)
 
-                # 执行一步解码（我们只关心第一个预测词的梯度）
-                embedded = self.model.decoder.embedding(input_ids)
-                lstm_out, (h, c) = self.model.decoder.lstm(embedded, (h, c))
-                logits = self.model.decoder.output_proj(lstm_out).squeeze(1)  # [1, vocab_size]
+                # 准备特征用于注意力
+                features_for_attn = feature_map.view(B, 512, -1).permute(0, 2, 1)  # [B, 49, 512]
 
-                # 对第一个预测词的所有 logit 求和（得到 scalar 用于 backward）
+                # 编码疾病特征
+                disease_context = self.model.decoder.disease_encoder(disease_features)  # [B, 256]
+
+                # 第一个token: SOS
+                sos_id = 1  # 假设SOS token ID是1
+                input_ids = torch.tensor([[sos_id]], dtype=torch.long, device=image_tensor.device)
+
+                # 执行一步解码
+                embedding = self.model.decoder.embedding(input_ids[:, -1])  # [B, 512]
+                
+                # 计算注意力
+                context, _ = self.model.decoder.attention(
+                    features_for_attn, h[-1], disease_features
+                )  # [B, 512]
+                
+                # LSTM输入
+                lstm_input = torch.cat(
+                    (embedding, context, disease_context), dim=1
+                ).unsqueeze(1)  # [B, 1, 1280]
+                
+                out, (h, c) = self.model.decoder.lstm(lstm_input, (h, c))
+                logits = self.model.decoder.fc(out.squeeze(1))  # [B, vocab_size]
+
+                # 对所有logit求和作为loss
                 score = logits[0].sum()
 
-                # 清零梯度并反向传播
+                # 反向传播
                 self.model.zero_grad()
                 score.backward(retain_graph=False)
 
             # === 计算 Grad-CAM ===
             if self.gradients is None or self.feature_maps is None:
-                raise RuntimeError("未能捕获梯度或特征图，请检查 hook 是否注册成功")
+                raise RuntimeError("未能捕获梯度或特征图")
 
             gradients = self.gradients  # [1, 512, 7, 7]
             feature_maps = self.feature_maps  # [1, 512, 7, 7]
@@ -114,7 +130,7 @@ class GradCAM:
 
 
 def preprocess_image(image_path, img_size=(224, 224), mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]):
-    """与 engine.py 一致的预处理流程，并返回同样尺寸的原始图像用于可视化"""
+    """图像预处理"""
     from torchvision import transforms
     image = Image.open(image_path).convert('RGB')
     resized_image = image.resize(img_size, Image.Resampling.LANCZOS)
@@ -148,7 +164,7 @@ def main():
 
     print(f"🖼️  加载图片: {image_path}")
 
-    # === 初始化引擎（仅用于加载模型）===
+    # === 初始化引擎 ===
     config = Config()
     engine_config = {
         'MODEL_PATH': config.MODEL_PATH,
@@ -174,7 +190,7 @@ def main():
         print("❌ 模型加载失败")
         sys.exit(1)
 
-    # === 获取 ResNet 的 layer4 模块（索引 7）===
+    # === 获取 ResNet 的 layer4 ===
     target_layer = model.encoder.features[7]  # resnet.layer4
     print(f"🎯 Hook 目标层: model.encoder.features[7] (ResNet layer4)")
 
@@ -188,13 +204,9 @@ def main():
     input_tensor = input_tensor.to(engine.device)
 
     # === 生成 Grad-CAM ===
+    print("🔥 生成Grad-CAM热力图...")
     grad_cam = GradCAM(model, target_layer)
-    cam = grad_cam(
-        input_tensor,
-        sos_id=config.SOS_TOKEN_ID,
-        eos_id=config.EOS_TOKEN_ID,
-        max_len=10
-    )
+    cam = grad_cam(input_tensor, max_len=10)
 
     # === 叠加热力图 ===
     overlay = overlay_heatmap(original_img, cam)
@@ -202,30 +214,54 @@ def main():
     # === 保存结果 ===
     base_name = os.path.splitext(os.path.basename(image_path))[0]
     output_path = f"gradcam_{base_name}.png"
-    plt.figure(figsize=(12, 4))
+    
+    plt.figure(figsize=(15, 5))
 
     plt.subplot(1, 3, 1)
     plt.imshow(original_img)
-    plt.title("Original Image")
+    plt.title("Original Image", fontsize=14)
     plt.axis('off')
 
     plt.subplot(1, 3, 2)
     plt.imshow(cam, cmap='jet')
-    plt.title("Grad-CAM Heatmap")
+    plt.title("Grad-CAM Heatmap", fontsize=14)
+    plt.colorbar(fraction=0.046, pad=0.04)
     plt.axis('off')
 
     plt.subplot(1, 3, 3)
     plt.imshow(overlay)
-    plt.title("Overlay")
+    plt.title("Overlay", fontsize=14)
     plt.axis('off')
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
     print(f"✅ Grad-CAM 结果已保存至: {output_path}")
 
-    # === 同时生成 AI 报告用于对比 ===
+    # === 生成 AI 报告 ===
+    print("\n📝 生成AI报告...")
     report = engine.generate(image_path)
-    print(f"\n📝 AI 生成报告:\n{report}")
+    print(f"\nAI报告:\n{report}")
+    
+    # === 显示疾病检测 ===
+    print("\n🔬 疾病检测分析...")
+    with torch.no_grad():
+        feature_map, global_features = model.encoder(input_tensor)
+        disease_logits = model.disease_classifier(global_features)
+        disease_probs = torch.sigmoid(disease_logits)[0].cpu().numpy()
+    
+    from inference_engine.model_definition import DISEASE_NAMES
+    
+    print("\n检测到的异常（概率>0.3）：")
+    detected = False
+    for i, (name, prob) in enumerate(zip(DISEASE_NAMES, disease_probs)):
+        if prob > 0.3:
+            print(f"  - {name}: {prob:.2%}")
+            detected = True
+    
+    if not detected:
+        print("  未检测到明显异常")
+    
+    print(f"\n🎉 完成！结果已保存到 {output_path}")
 
 
 if __name__ == '__main__':
