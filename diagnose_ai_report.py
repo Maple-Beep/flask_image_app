@@ -32,27 +32,27 @@ def test_sampling_strategies(engine, image_path):
     strategies = [
         {
             'name': '贪婪解码（最确定）',
-            'params': {'use_sampling': False}
+            'params': {}
         },
         {
             'name': '温度采样 (T=0.7, 更保守)',
-            'params': {'temperature': 0.7, 'top_k': 0, 'top_p': 0.0, 'use_sampling': True}
+            'params': {'temperature': 0.7, 'top_k': 0, 'top_p': 0.0}
         },
         {
             'name': '温度采样 (T=1.0, 标准)',
-            'params': {'temperature': 1.0, 'top_k': 0, 'top_p': 0.0, 'use_sampling': True}
+            'params': {'temperature': 1.0, 'top_k': 0, 'top_p': 0.0}
         },
         {
             'name': 'Top-K采样 (K=30)',
-            'params': {'temperature': 0.8, 'top_k': 30, 'top_p': 0.0, 'use_sampling': True}
+            'params': {'temperature': 0.8, 'top_k': 30, 'top_p': 0.0}
         },
         {
             'name': 'Top-P采样 (P=0.9, Nucleus)',
-            'params': {'temperature': 0.8, 'top_k': 0, 'top_p': 0.9, 'use_sampling': True}
+            'params': {'temperature': 0.8, 'top_k': 0, 'top_p': 0.9}
         },
         {
             'name': 'Top-K + Top-P组合（推荐）',
-            'params': {'temperature': 0.8, 'top_k': 50, 'top_p': 0.9, 'use_sampling': True}
+            'params': {'temperature': 0.8, 'top_k': 30, 'top_p': 0.9}
         },
     ]
     
@@ -78,7 +78,7 @@ def generate_multiple_samples(engine, image_path, num_samples=5):
             image_path, 
             num_samples=num_samples,
             temperature=0.8,
-            top_k=50,
+            top_k=30,
             top_p=0.9
         )
         
@@ -180,7 +180,7 @@ def main():
     print("="*80)
     print(f"📁 图片路径: {image_path}")
     
-    # 构建配置
+    # 构建配置（Transformer架构参数）
     config = Config()
     engine_config = {
         'MODEL_PATH': config.MODEL_PATH,
@@ -189,10 +189,10 @@ def main():
         'IMG_MEAN': config.IMG_MEAN,
         'IMG_STD': config.IMG_STD,
         'VOCAB_SIZE': config.VOCAB_SIZE,
-        'CNN_OUT_FEATURES': config.CNN_OUT_FEATURES,
-        'LSTM_HIDDEN_SIZE': config.LSTM_HIDDEN_SIZE,
-        'LSTM_NUM_LAYERS': config.LSTM_NUM_LAYERS,
-        'LSTM_DROPOUT': config.LSTM_DROPOUT,
+        'D_MODEL': config.D_MODEL,
+        'NHEAD': config.NHEAD,
+        'NUM_LAYERS': config.NUM_LAYERS,
+        'DROPOUT': config.DROPOUT,
         'MAX_REPORT_LEN': config.MAX_REPORT_LEN,
         'PAD_TOKEN_ID': config.PAD_TOKEN_ID,
         'SOS_TOKEN_ID': config.SOS_TOKEN_ID,
@@ -241,7 +241,7 @@ def main():
     print("   - 使用top_k=30限制候选词")
     print("   - 确认输入图像是胸部X光")
     print("\n3. 推荐的生成参数:")
-    print("   temperature=0.8, top_k=50, top_p=0.9, use_sampling=True")
+    print("   temperature=0.8, top_k=30, top_p=0.9")
     print("\n4. 如果疾病检测不准确:")
     print("   - 这是正常的，模型主要用于报告生成")
     print("   - 疾病特征用于辅助报告生成，不是诊断工具")

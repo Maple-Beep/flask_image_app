@@ -314,15 +314,16 @@ def generate_report(image_id):
         return redirect(url_for('user_profile'))
 
     image_path = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'], image.filename)
-    
-    # 使用增强的采样策略生成报告
-    # 可以调整这些参数来控制生成的多样性
+
+    if not os.path.exists(image_path):
+        flash("图像文件不存在，无法生成报告。", "error")
+        return redirect(url_for('user_profile'))
+
     report_text = report_engine.generate(
         image_path,
-        temperature=0.8,      # 温度：0.7-1.0，越高越随机
-        top_k=50,             # Top-K采样：保留概率最高的50个词
-        top_p=0.9,            # Top-P采样：核采样，累积概率0.9
-        use_sampling=True     # 使用采样而非贪婪解码
+        temperature=0.8,   # 温度：0.8 较保守，质量稳定
+        top_k=30,          # Top-K：30 平衡多样性与质量
+        top_p=0.9,         # Top-P 核采样
     )
     
     image.ai_report = report_text
@@ -341,7 +342,7 @@ if __name__ == '__main__':
             db.session.commit()
             print("初始管理员账户已创建: 用户名 'admin', 密码 'admin123'")
 
-        # --- 构建配置字典并初始化引擎 ---
+        # --- 构建配置字典并初始化引擎（Transformer架构参数）---
         engine_config = {
             'MODEL_PATH': app.config['MODEL_PATH'],
             'VOCAB_PATH': app.config['VOCAB_PATH'],
@@ -349,17 +350,18 @@ if __name__ == '__main__':
             'IMG_MEAN': app.config['IMG_MEAN'],
             'IMG_STD': app.config['IMG_STD'],
             'VOCAB_SIZE': app.config['VOCAB_SIZE'],
-            'CNN_OUT_FEATURES': app.config['CNN_OUT_FEATURES'],
-            'LSTM_HIDDEN_SIZE': app.config['LSTM_HIDDEN_SIZE'],
-            'LSTM_NUM_LAYERS': app.config['LSTM_NUM_LAYERS'],
-            'LSTM_DROPOUT': app.config['LSTM_DROPOUT'],
+            # Transformer 架构参数（对应训练工程）
+            'D_MODEL': app.config['D_MODEL'],
+            'NHEAD': app.config['NHEAD'],
+            'NUM_LAYERS': app.config['NUM_LAYERS'],
+            'DROPOUT': app.config['DROPOUT'],
             'MAX_REPORT_LEN': app.config['MAX_REPORT_LEN'],
             'PAD_TOKEN_ID': app.config['PAD_TOKEN_ID'],
             'SOS_TOKEN_ID': app.config['SOS_TOKEN_ID'],
             'EOS_TOKEN_ID': app.config['EOS_TOKEN_ID'],
         }
 
-        # ✅ 使用增强版的 MedicalReportEngine（可选启用debug模式）
+        # ✅ 初始化 Transformer 版 MedicalReportEngine
         app.report_engine = MedicalReportEngine(config_dict=engine_config, debug=False)
 
     app.run(debug=True)
